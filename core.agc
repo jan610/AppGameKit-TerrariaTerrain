@@ -49,3 +49,19 @@ function Core_Clamp(Value#,Min#,Max#)
 	if Value#>Max# then Value#=Max#
 	if Value#<Min# then Value#=Min#
 endfunction Value#
+
+function Core_min(value1#,value2#)
+	if value1#>value2# then exitfunction value2#
+endfunction value1#
+
+function Core_max(value1#,value2#)
+	if value1#>value2# then exitfunction value1#
+endfunction value2#
+
+function Core_sign(value#)
+	if value#>0
+		exitfunction 1
+	elseif value#<0
+		exitfunction -1
+	endif
+endfunction 0
