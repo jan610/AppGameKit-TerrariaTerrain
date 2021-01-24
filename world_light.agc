@@ -39,7 +39,7 @@ function world_ColculateLight()
 			next NeighbourID
 		endif
 	endwhile
-endif
+endfunction
 
 /*
 function World_CalculateLight(BlockX,BlockY)

@@ -129,7 +129,9 @@ function World_DeleteSprite(BlockX,BlockY)
 	endif
 endfunction
 
-function World_Update()	
+function World_Update()
+	world_ColculateLight()
+	
     FrameTime#=GetFrameTime()
     
     Speed#=100.0
