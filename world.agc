@@ -38,6 +38,7 @@ endtype
 type WorldData
 	Block as BlockData[-1,-1]
 	Biome as integer[-1]
+	Height as integer[-1]
 	Light as LightData[-1]
 endtype
 
@@ -53,7 +54,7 @@ function World_Init(WorldSizeX,WorldSizeY,TileSize)
 	
 	global TileImageID as integer[15]
 	for Index=0 to TileImageID.length
-		TileImageID[Index]=LoadSubImage(AtlasImageID,"img"+str(Index)) //For now I use LoadSubImage but i will make a shader for it
+		TileImageID[Index]=LoadSubImage(AtlasImageID,"img"+str(Index))
 	next
 	
 	global World as WorldData
@@ -71,17 +72,26 @@ function World_Init(WorldSizeX,WorldSizeY,TileSize)
 	for BlockX=0 to World.Block.length
 		for BlockY=World.Block[0].length to 0 step -1
 			Noise#=0.5+Noise_Perlin2(BlockX/Frecueny#,BlockY/Frecueny#)
-			BlockTypID=round(Noise#)
-			
-//~			World_CreateBlock(BlockX,BlockY,BlockTypID)
-
-			World.Block[BlockX,BlockY].Color.Red=128
-			World.Block[BlockX,BlockY].Color.Green=128
-			World.Block[BlockX,BlockY].Color.Blue=128
-			World.Block[BlockX,BlockY].TypID=BlockTypID
-			TileID=Autotiling(BlockX,BlockY)
-			World.Block[BlockX,BlockY].ImageID=TileImageID[TileID]
+			World.Block[BlockX,BlockY].TypID=round(Noise#)
+			World.Block[BlockX,BlockY].Color.Red=32
+			World.Block[BlockX,BlockY].Color.Green=32
+			World.Block[BlockX,BlockY].Color.Blue=32
 		next BlockY
+		Height=World_GetGroundHeight(BlockX)
+		World.Height.insert(Height)
+	next BlockX
+	
+	ViewLeft=World_GetCameraLeftBound()
+	ViewTop=World_GetCameraTopBound()
+	ViewRight=World_GetCameraRightBound()
+	ViewBottom=World_GetCameraBottomBound()
+	
+	for BlockX=ViewLeft to ViewRight
+		for BlockY=ViewTop to ViewBottom	
+			World_CreateSprite(BlockX,BlockY)
+		next BlockY
+		
+		World_SetSunLight(BlockX)
 	next BlockX
 	
 	Global NumberTilesX
@@ -111,75 +121,6 @@ function World_Init(WorldSizeX,WorldSizeY,TileSize)
 	
 	global ViewPosX#
 	global ViewPosY#
-    
-    
-//~	ScreenWidth#=GetScreenBoundsRight()-GetScreenBoundsLeft()
-//~	ScreenHeight#=GetScreenBoundsBottom()-GetScreenBoundsTop()
-//~	RenderImageWidth=17
-//~	RenderImageHeight=13
-//~    global RenderImageID
-//~    RenderImageID=CreateRenderImage(RenderImageWidth,RenderImageHeight,0,0)
-//~    SetImageTransparentColor(RenderImageID,255,255,255)
-//~    SetImageMagFilter(RenderImageID,0)
-//~    
-//~	ScreenWidth#=GetScreenBoundsRight()-GetScreenBoundsLeft()
-//~	ScreenHeight#=GetScreenBoundsBottom()-GetScreenBoundsTop()
-//~    
-//~    global LightMapSpriteID
-//~    LightMapSpriteID=CreateSprite(RenderImageID)
-//~	SetSpritePositionByOffset(LightMapSpriteID,50,50)
-//~	SetSpriteSize(LightMapSpriteID,ScreenWidth#,ScreenHeight#)
-//~	FixSpriteToScreen(LightMapSpriteID,1)
-//~	SetSpriteTransparency(LightMapSpriteID,1)
-
-
-//~	global ShadowSpriteID
-//~	ImageID=CreateImageColor(0,0,0,255)
-//~	ShadowSpriteID=CreateSprite(ImageID)
-//~	SetSpriteSize(ShadowSpriteID,TileSize,TileSize)
-//~	SetSpriteDepth(ShadowSpriteID,9)
-    
-//~	Global LightMapMemblockID
-//~	Width=40
-//~	Height=25
-//~	Size=12+Width*Height*4
-//~	LightMapMemblockID=CreateMemblock(Size)
-//~	SetMemblockInt(LightMapMemblockID,0,Width)
-//~	SetMemblockInt(LightMapMemblockID,4,Height)
-//~	SetMemblockInt(LightMapMemblockID,8,32)
-//~	for Y=0 to Height-1
-//~		for X=0 to Width-1
-//~			Offset=(4*((Y*Width)+X))+12
-//~			SetMemblockByte(LightMapMemblockID,Offset,255)
-//~			SetMemblockByte(LightMapMemblockID,Offset+1,255)
-//~			SetMemblockByte(LightMapMemblockID,Offset+2,255)
-//~			SetMemblockByte(LightMapMemblockID,Offset+3,255)
-//~		next X
-//~	next Y
-//~	
-//~ Global LightMapImageID
-//~	LightMapImageID=CreateImageFromMemblock(LightMapMemblockID)
-//~	
-//~	ScreenWidth#=GetScreenBoundsRight()-GetScreenBoundsLeft()
-//~	ScreenHeight#=GetScreenBoundsBottom()-GetScreenBoundsTop()
-//~	
-//~	Global LightMapSpriteID
-//~	LightMapSpriteID=CreateSprite(LightMapImageID)
-//~	SetSpritePositionByOffset(LightMapSpriteID,50,50)
-//~	SetSpriteScaleByOffset(LightMapSpriteID,16,16)
-//~	SetSpriteSize(LightMapSpriteID,ScreenWidth#,ScreenHeight#)
-//~	SetSpriteDepth(LightMapSpriteID,9)
-//~	SetSpriteTransparency(LightMapSpriteID,1)
-//~	FixSpriteToScreen(LightMapSpriteID,1)
-	
-	global WorldSpriteID
-	WorldSpriteID=createsprite(AtlasImageID)
-	SetSpriteSize(WorldSpriteID,TileSize,TileSize)
-	SetSpriteSnap(WorldSpriteID,1)
-	
-//~	SetImageWrapU(WorldSpriteID,1)
-//~	SetImageWrapV(WorldSpriteID,1)
-//~	SetSpriteUVScale(WorldSpriteID,NumberTilesX,NumberTilesY)
 endfunction
 
 function World_GetBlockTypID(BlockX,BlockY)
@@ -199,10 +140,15 @@ function World_CreateBlock(BlockX,BlockY,TypID)
 	BlockX=Core_Clamp(BlockX,1,World.Block.length-1)
 	BlockY=Core_Clamp(BlockY,1,World.Block[0].length-1)
 	
-	World.Block[BlockX,BlockY].Color.Red=128
-	World.Block[BlockX,BlockY].Color.Green=128
-	World.Block[BlockX,BlockY].Color.Blue=128
 	World.Block[BlockX,BlockY].TypID=TypID
+	World.Block[BlockX,BlockY].Color.Red=32
+	World.Block[BlockX,BlockY].Color.Green=32
+	World.Block[BlockX,BlockY].Color.Blue=32
+	
+//~	if BlockY<World.Height[BlockX] then World.Height[BlockX]=BlockY
+	Height=World_GetGroundHeight(BlockX)
+	World.Height[BlockX]=Height
+	World_SetSunLight(BlockX)
 	
 	World_CreateSprite(BlockX,BlockY)
 endfunction
@@ -219,10 +165,7 @@ function World_CreateSprite(BlockX,BlockY)
 			SpriteID=CreateSprite(World.Block[BlockX,BlockY].ImageID)
 			SetSpriteSize(SpriteID,WorldTileSize,WorldTileSize)
 			SetSpritePositionByOffset(SpriteID,BlockX*WorldTileSize,BlockY*WorldTileSize)
-			Red=World.Block[BlockX,BlockY].Color.Red
-			Green=World.Block[BlockX,BlockY].Color.Green
-			Blue=World.Block[BlockX,BlockY].Color.Blue
-			SetSpriteColor(SpriteID,Red,Green,Blue,255)
+			SetSpriteColor(SpriteID,World.Block[BlockX,BlockY].Color.Red,World.Block[BlockX,BlockY].Color.Green,World.Block[BlockX,BlockY].Color.Blue,255)
 			World.Block[BlockX,BlockY].SpriteID=SpriteID
 		endif
 	endif
@@ -267,6 +210,10 @@ function World_DeleteBlock(BlockX,BlockY)
 	World.Block[BlockX,BlockY].Color.Green=0
 	World.Block[BlockX,BlockY].Color.Blue=0
 	
+	Height=World_GetGroundHeight(BlockX)
+	World.Height[BlockX]=Height
+	World_SetSunLight(BlockX)
+	
 	World_DeleteSprite(BlockX,BlockY)
 endfunction
 
@@ -307,7 +254,12 @@ function World_DeleteSprite(BlockX,BlockY)
 	endif
 endfunction
 
-function World_Update()					
+function World_Update()	
+	ViewLeft=World_GetCameraLeftBound()
+	ViewTop=World_GetCameraTopBound()
+	ViewRight=World_GetCameraRightBound()
+	ViewBottom=World_GetCameraBottomBound()
+	
 	while Frontier.length>=0
 		BlockX=Frontier[0].x
 		BlockY=Frontier[0].y
@@ -327,16 +279,16 @@ function World_Update()
 					Frontier.insert(TempFrontier)
 					
 					if World.Block[NeighbourX,NeighbourY].TypID=0
-						World.Block[NeighbourX,NeighbourY].Color.Red=Red*0.9
-						World.Block[NeighbourX,NeighbourY].Color.Green=Green*0.9
-						World.Block[NeighbourX,NeighbourY].Color.Blue=Blue*0.9
+						World.Block[NeighbourX,NeighbourY].Color.Red=Red*0.7
+						World.Block[NeighbourX,NeighbourY].Color.Green=Green*0.7
+						World.Block[NeighbourX,NeighbourY].Color.Blue=Blue*0.7
 						if World.Block[NeighbourX,NeighbourY].SpriteID>0
 							SetSpriteColor(World.Block[NeighbourX,NeighbourY].SpriteID,Red*0.9,Green*0.9,Blue*0.9,255)
 						endif
 					else
-						World.Block[NeighbourX,NeighbourY].Color.Red=Red*0.8
-						World.Block[NeighbourX,NeighbourY].Color.Green=Green*0.8
-						World.Block[NeighbourX,NeighbourY].Color.Blue=Blue*0.8
+						World.Block[NeighbourX,NeighbourY].Color.Red=Red*0.5
+						World.Block[NeighbourX,NeighbourY].Color.Green=Green*0.5
+						World.Block[NeighbourX,NeighbourY].Color.Blue=Blue*0.5
 						if World.Block[NeighbourX,NeighbourY].SpriteID>0
 							SetSpriteColor(World.Block[NeighbourX,NeighbourY].SpriteID,Red*0.8,Green*0.8,Blue*0.8,255)
 						endif
@@ -370,106 +322,78 @@ function World_Update()
     
     SetViewZoom(ViewZoom#)
 	SetViewOffset(ViewPosX#,ViewPosY#)
-
-	ViewLeft#=ScreenToWorldX(GetScreenBoundsLeft())/WorldTileSize
-	ViewTop#=ScreenToWorldY(GetScreenBoundsTop())/WorldTileSize
-	ViewRight#=ScreenToWorldX(GetScreenBoundsRight())/WorldTileSize
-	ViewBottom#=ScreenToWorldY(GetScreenBoundsBottom())/WorldTileSize
-
-	ViewLeft=round(ViewLeft#-1)
-	ViewTop=round(ViewTop#-1)
-	ViewRight=round(ViewRight#+1)
-	ViewBottom=round(ViewBottom#+1)
-	
-	ViewLeftClamp=Core_Clamp(ViewLeft,0,World.Block.length)
-	ViewTopClamp=Core_Clamp(ViewTop,0,World.Block[0].length)
-	ViewRightClamp=Core_Clamp(ViewRight,0,World.Block.length)
-	ViewBottomClamp=Core_Clamp(ViewBottom,0,World.Block[0].length)
 	
 	CameraBlockX=round(ViewPosX#/WorldTileSize)
 	CameraBlockY=round(ViewPosY#/WorldTileSize)
-	
 	
 	if CameraBlockX<>OldCameraBlockX
 		OldCameraBlockX=CameraBlockX
 		ViewSignX=abs(Core_sign(ViewSpeedX#/WorldTileSize))
 		if ViewSpeedX#>0
-			for BlockX=ViewLeftClamp to ViewLeftClamp-ViewSignX step -1
+			for BlockX=ViewLeft to ViewLeft-ViewSignX step -1
 				NewBlockX=Core_max(BlockX,0)
-				for BlockY=ViewTopClamp to ViewBottomClamp
+				for BlockY=ViewTop to ViewBottom
 					World_DeleteSprite(NewBlockX,BlockY)
 				next BlockY
 			next BlockX
-			for BlockX=ViewRightClamp to ViewRightClamp+ViewSignX
+			for BlockX=ViewRight to ViewRight+ViewSignX
 				NewBlockX=Core_min(BlockX,World.Block.length)
-				for BlockY=ViewTopClamp to ViewBottomClamp
+				
+				World_SetSunLight(NewBlockX)
+				
+				for BlockY=ViewTop to ViewBottom
 					World_CreateSprite(NewBlockX,BlockY)
 				next BlockY
 			next BlockX
 		elseif ViewSpeedX#<0
-			for BlockX=ViewRightClamp to ViewRightClamp+ViewSignX
-				NewBlockX=Core_max(BlockX,0)
-				for BlockY=ViewTopClamp to ViewBottomClamp
+			for BlockX=ViewRight to ViewRight+ViewSignX
+				NewBlockX=Core_min(BlockX,World.Block.length)
+				for BlockY=ViewTop to ViewBottom
 					World_DeleteSprite(NewBlockX,BlockY)
 				next BlockY
 			next BlockX
-			for BlockX=ViewLeftClamp to ViewLeftClamp-ViewSignX step -1
-				NewBlockX=Core_min(BlockX,World.Block.length)
-				for BlockY=ViewTopClamp to ViewBottomClamp
+			for BlockX=ViewLeft to ViewLeft-ViewSignX step -1
+				NewBlockX=Core_max(BlockX,0)
+				
+				World_SetSunLight(NewBlockX)
+				
+				for BlockY=ViewTop to ViewBottom
 					World_CreateSprite(NewBlockX,BlockY)
 				next BlockY
 			next BlockX
 		endif
 	endif
-	
 	if CameraBlockY<>OldCameraBlockY
 		OldCameraBlockY=CameraBlockY
 		ViewSignY=abs(Core_sign(ViewSpeedY#/WorldTileSize))
 		if ViewSpeedY#>0
-			for BlockY=ViewTopClamp to ViewTopClamp-ViewSignY step -1
+			for BlockY=ViewTop to ViewTop-ViewSignY step -1
 				NewBlockY=Core_max(BlockY,0)
-				for BlockX=ViewLeftClamp to ViewRightClamp
+				for BlockX=ViewLeft to ViewRight
 					World_DeleteSprite(BlockX,NewBlockY)
 				next BlockX
 			next BlockY
-			for BlockY=ViewBottomClamp to ViewBottomClamp+ViewSignY
+			for BlockY=ViewBottom to ViewBottom+ViewSignY
 				NewBlockY=Core_min(BlockY,World.Block.length)
-				for BlockX=ViewLeftClamp to ViewRightClamp
+				for BlockX=ViewLeft to ViewRight
 					World_CreateSprite(BlockX,NewBlockY)
 				next BlockX
 			next BlockY
 		elseif ViewSpeedY#<0
-			for BlockY=ViewBottomClamp to ViewBottomClamp+ViewSignY
-				NewBlockY=Core_max(BlockY,0)
-				for BlockX=ViewLeftClamp to ViewRightClamp
+			for BlockY=ViewBottom to ViewBottom+ViewSignY
+				NewBlockY=Core_min(BlockY,World.Block.length)
+				for BlockX=ViewLeft to ViewRight
 					World_DeleteSprite(BlockX,NewBlockY)
 				next BlockX
 			next BlockY
-			for BlockY=ViewTopClamp to ViewTopClamp-ViewSignY step -1
-				NewBlockY=Core_min(BlockY,World.Block.length)
-				for BlockX=ViewLeftClamp to ViewRightClamp
+			for BlockY=ViewTop to ViewTop-ViewSignY step -1
+				NewBlockY=Core_max(BlockY,0)
+				for BlockX=ViewLeft to ViewRight
 					World_CreateSprite(BlockX,NewBlockY)
 				next BlockX
 			next BlockY
 		endif
 	endif
-	
-//~	
-//~	SetRenderToImage(RenderImageID,0)
-//~	SetClearColor(255,255,255)
-//~	ClearScreen()
-//~	for BlockX=ViewLeftClamp to ViewRightClamp
-//~		for BlockY=ViewTopClamp to ViewBottomClamp
-//~			if World.Block[BlockX,BlockY].SpriteID>0
-//~				SetSpritePositionByOffset(ShadowSpriteID,BlockX*WorldTileSize,BlockY*WorldTileSize)
-//~				DrawSprite(ShadowSpriteID)
-//~			endif
-//~		next BlockY
-//~	next BlockX
-//~	SetRenderToScreen()
-//~	SetClearColor(32,64,128)
-//~	
-//~	SetSpritePositionByOffset(LightMapSpriteID,50+(0.5-fmod(ViewLeft#,1))*8.0,50+(0.5-fmod(ViewTop#,1))*8.0)
 	
 	/*
 	for BlockX=ViewLeftClamp to ViewRightClamp
@@ -490,46 +414,46 @@ function World_Update()
 		next BlockY
 	next BlockX*/
 
-//~	Width=40
-//~	Height=25
-//~	for Y=0 to Height-1
-//~		for X=0 to Width-1
-//~			Offset=(4*((Y*Width)+X))+12
-//~			if World.Block[ViewLeftClamp+X,ViewTopClamp+Y].TypID<>0
-//~				SetMemblockByte(LightMapMemblockID,Offset,0)
-//~				SetMemblockByte(LightMapMemblockID,Offset+1,0)
-//~				SetMemblockByte(LightMapMemblockID,Offset+2,0)
-//~				SetMemblockByte(LightMapMemblockID,Offset+3,255)
-//~			else
-//~				SetMemblockByte(LightMapMemblockID,Offset+3,0)
-//~			endif
-//~		next X
-//~	next Y
-//~	CreateImageFromMemblock(LightMapImageID,LightMapMemblockID)
-//~	SetSpriteImage(LightMapSpriteID,LightMapImageID)
-
-//~	SetSpritePositionByOffset(LightMapSpriteID,50+fmod(ViewLeft#,0.5)*4,50+fmod(ViewTop#,0.5)*4)
-//~	print(fmod(ViewLeft#,1))
-			
-//~	for BlockX=ViewLeftClamp to ViewRightClamp
-//~		for BlockY=ViewTopClamp to ViewBottomClamp	
-//~			if World.Block[BlockX,BlockY].TypID<>0
-//~				SetSpritePositionByOffset(WorldSpriteID,BlockX*WorldTileSize,BlockY*WorldTileSize)
-//~				SetSpriteImage(WorldSpriteID,World.Block[BlockX,BlockY].ImageID)
-//~				    
-//~			    regionIndex=World.Block[BlockX,BlockY].ImageID
-//~				U#=mod(regionIndex,NumberTilesX)/(NumberTilesX+0.0)
-//~				V#=(regionIndex/NumberTilesY)/(NumberTilesY+0.0)
-//~				SetSpriteUVOffset(WorldSpriteID,U#,V#)
-//~				SetSpriteColor(WorldSpriteID,World.Block[BlockX,BlockY].Color.Red,World.Block[BlockX,BlockY].Color.Green,World.Block[BlockX,BlockY].Color.Blue,255)
-//~				DrawSprite(WorldSpriteID)
-//~			endif
-//~			World.Block[BlockX,BlockY].OldColor.Red=World.Block[BlockX,BlockY].Color.Red
-//~			World.Block[BlockX,BlockY].OldColor.Green=World.Block[BlockX,BlockY].Color.Green
-//~			World.Block[BlockX,BlockY].OldColor.Blue=World.Block[BlockX,BlockY].Color.Blue
-//~		next BlockY
-//~	next BlockX
+	/*
+	for BlockX=ViewLeftClamp to ViewRightClamp
+		for BlockY=ViewTopClamp to ViewBottomClamp	
+			if World.Block[BlockX,BlockY].TypID<>0
+				SetSpritePositionByOffset(WorldSpriteID,BlockX*WorldTileSize,BlockY*WorldTileSize)
+				SetSpriteImage(WorldSpriteID,World.Block[BlockX,BlockY].ImageID)
+				    
+			    regionIndex=World.Block[BlockX,BlockY].ImageID
+				U#=mod(regionIndex,NumberTilesX)/(NumberTilesX+0.0)
+				V#=(regionIndex/NumberTilesY)/(NumberTilesY+0.0)
+				SetSpriteUVOffset(WorldSpriteID,U#,V#)
+				SetSpriteColor(WorldSpriteID,World.Block[BlockX,BlockY].Color.Red,World.Block[BlockX,BlockY].Color.Green,World.Block[BlockX,BlockY].Color.Blue,255)
+				DrawSprite(WorldSpriteID)
+			endif
+			World.Block[BlockX,BlockY].OldColor.Red=World.Block[BlockX,BlockY].Color.Red
+			World.Block[BlockX,BlockY].OldColor.Green=World.Block[BlockX,BlockY].Color.Green
+			World.Block[BlockX,BlockY].OldColor.Blue=World.Block[BlockX,BlockY].Color.Blue
+		next BlockY
+	next BlockX*/
 endfunction
+
+function World_GetCameraLeftBound()
+	ViewLeft=round(ScreenToWorldX(GetScreenBoundsLeft())/WorldTileSize)-1
+	ViewLeftClamp=Core_Clamp(ViewLeft,0,World.Block.length)
+endfunction ViewLeftClamp
+
+function World_GetCameraTopBound()
+	ViewTop=round(ScreenToWorldY(GetScreenBoundsTop())/WorldTileSize)-1
+	ViewTopClamp=Core_Clamp(ViewTop,0,World.Block[0].length)
+endfunction ViewTopClamp
+
+function World_GetCameraRightBound()
+	ViewRight=round(ScreenToWorldX(GetScreenBoundsRight())/WorldTileSize)+1
+	ViewRightClamp=Core_Clamp(ViewRight,0,World.Block.length)
+endfunction ViewRightClamp
+
+function World_GetCameraBottomBound()
+	ViewBottom=round(ScreenToWorldY(GetScreenBoundsBottom())/WorldTileSize)+1
+	ViewBottomClamp=Core_Clamp(ViewBottom,0,World.Block[0].length)
+endfunction ViewBottomClamp
 
 function World_CalculateLight(BlockX,BlockY)
 	RedBottom=0
@@ -578,11 +502,22 @@ function World_CalculateLight(BlockX,BlockY)
 	endif
 endfunction
 
+function World_SetSunLight(BlockX) // need a function to also remove the last sunlight if there is a new higher point
+	BlockY=World.Height[BlockX]
+	if BlockY>=0
+		World.Block[BlockX,BlockY].Color.Red=255
+		World.Block[BlockX,BlockY].Color.Green=255
+		World.Block[BlockX,BlockY].Color.Blue=255
+		
+		TempFrontier.X=BlockX
+		TempFrontier.Y=BlockY
+		Frontier.insert(TempFrontier)
+	endif
+endfunction
+
 function World_GetGroundHeight(BlockX)
-	for BlockY=0 to World.Block.length-0
-		if World.Block[BlockX,BlockY].TypID<>0
-			exitfunction BlockY
-		endif
+	for BlockY=1 to World.Block[0].length
+		if World.Block[BlockX,BlockY].TypID<>0 then exitfunction BlockY
 	next BlockY
 endfunction 0
 
