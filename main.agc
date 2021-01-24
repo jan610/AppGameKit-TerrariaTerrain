@@ -6,7 +6,7 @@
 
 SetErrorMode(2)
 
-#include "world.agc"
+#include "world_init.agc"
 
 // set window properties
 SetWindowTitle( "AppGameKit-TerrariaTerrain" )
